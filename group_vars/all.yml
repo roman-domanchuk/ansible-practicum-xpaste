@@ -1,0 +1,9 @@
+---
+secret_key_base: "s3cr3tK3y#"
+app_environment: "production"
+log_to_stdout: 1
+db_host: "127.0.0.1"
+db_port: "5432"
+db_name: "xpaste_practicum"
+db_user: "xpaste_user"
+db_password: "s3cr3tK3y#"

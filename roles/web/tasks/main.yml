@@ -1,0 +1,81 @@
+---
+- name: Install dependencies
+  yum:
+    name:
+      - gcc
+      - gcc-c++
+      - make
+      - libxml2-devel
+      - git
+    state: present
+
+- name: Install RVM and Ruby
+  shell: |
+    curl -sSL https://get.rvm.io | bash
+    source /etc/profile.d/rvm.sh
+    rvm install ruby 2.5.1
+    gem install bundler -v 2.3.27
+  args:
+    creates: /usr/local/rvm/rubies/ruby-2.5.1
+
+- name: Ensure SSH directory exists for root
+  file:
+    path: /root/.ssh
+    state: directory
+    mode: '0700'
+    owner: root
+    group: root
+
+- name: Clone application repository
+  git:
+    repo: 'git@gitlab.slurm.io:edu/xpaste_practicum.git'
+    dest: /root/xpaste_practicum
+    version: master
+    key_file: /root/.ssh/id_rsa
+    accept_hostkey: yes
+
+- name: Configure bundler
+  shell: |
+    cd /root/xpaste_practicum
+    bundle config build.nokogiri --use-system-libraries
+    bundle install --clean --no-cache --without development
+  ignore_errors: yes
+
+- name: Create environment file
+  template:
+    src: .env.j2
+    dest: /root/xpaste_practicum/.env
+
+- name: Set permissions for environment file
+  file:
+    path: /root/xpaste_practicum/.env
+    owner: root
+    group: root
+
+- name: Create systemd service file
+  template:
+    src: service.j2
+    dest: /etc/systemd/system/xpaste_practicum.service
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+
+- name: Stop existing Puma processes
+  shell: |
+    puma_pids=$(pgrep -f puma)
+    if [ -n "$puma_pids" ]; then
+      echo "Stopping existing Puma processes..."
+      kill -9 $puma_pids
+    fi
+  ignore_errors: yes
+
+- name: Remove existing socket file
+  file:
+    path: /var/run/puma.sock
+    state: absent
+
+- name: Start application service
+  service:
+    name: xpaste_practicum
+    state: started
+    enabled: yes
